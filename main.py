@@ -1,6 +1,4 @@
-from asyncio import all_tasks
-import os 
-from os.path import isdir
+import os
 import pathlib
 
 def getAllItems(mainPath):
