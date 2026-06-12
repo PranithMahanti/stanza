@@ -24,8 +24,13 @@ def getMetadata(mainPath):
     }
     return data
 
-
 if __name__ == "__main__":
     music = getAllMusicFiles("~/Music/")
     #for i in music:
     #    print(getMetadata(os.path.join(i['dir'], i['name'])))
+    
+    print(f"{music[0]['dir']}{music[0]['name']}")
+    player = audio.NativeAudioPlayer(os.path.join(music[0]['dir'], music[0]['name']))
+    
+    if player.load_file():  
+        player.play()

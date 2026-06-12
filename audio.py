@@ -3,13 +3,16 @@ import sys
 import threading
 import sounddevice as sd
 import soundfile as sf
+import numpy as np
+from typing import Optional
 
 class NativeAudioPlayer:
     def __init__(self, file_path: str):
         self.file_path = os.path.expanduser(file_path)
-        self.data = None
-        self.fs = None
-        self.stream = None
+        
+        self.data: Optional[np.ndarray] = None
+        self.fs: Optional[int] = None
+        self.stream: Optional[sd.OutputStream] = None
         
         # Playback control states
         self.current_frame = 0
@@ -26,30 +29,40 @@ class NativeAudioPlayer:
             return True
         except Exception as e:
             print(f"Error loading audio file: {e}")
+            self.data = None
+            self.fs = None
             return False
 
-    def _callback(self, outdata, frames, time, status):
+    def _callback(self, outdata: np.ndarray, frames: int, time: list, status: sd.CallbackFlags) -> None:
         """Internal audio buffer feeding callback."""
         if status:
             print(status, file=sys.stderr)
         
-        # Calculate how many frames are left to play
+        if self.data is None:
+            outdata[:] = 0
+            raise sd.CallbackStop
+        
         chunksize = min(len(self.data) - self.current_frame, frames)
         
         if chunksize > 0:
-            # Feed the next chunk of audio data to the output hardware
             outdata[:chunksize] = self.data[self.current_frame:self.current_frame + chunksize]
             outdata[chunksize:] = 0
             self.current_frame += chunksize
         else:
-            # Track is finished
             outdata[:] = 0
             raise sd.CallbackStop
 
-    def play(self):
+    def play(self) -> None:
+        if self.data is None or self.fs is None:
+            print("Error: Cannot play. No audio data loaded.")
+            return
+
         if not self.is_playing:
+            if self.stream is not None:
+                self.stream.close()
+
             self.is_playing = True
-            # Create an output stream using our tracking callback function
+            
             self.stream = sd.OutputStream(
                 samplerate=self.fs, 
                 channels=self.data.shape[1],
@@ -59,32 +72,41 @@ class NativeAudioPlayer:
             self.stream.start()
             print("Playback Started.")
 
-    def pause(self):
-        if self.is_playing and self.stream:
+    def pause(self) -> None:
+        if self.is_playing and self.stream is not None:
             self.stream.stop()
             self.is_playing = False
             print("Playback Paused.")
 
-    def resume(self):
+    def resume(self) -> None:
         if not self.is_playing and self.data is not None:
-            self.play()
+            if self.stream is not None:
+                self.stream.start()
+                self.is_playing = True
+                print("Playback Resumed.")
+            else:
+                self.play()
 
-    def stop(self):
-        if self.stream:
+    def stop(self) -> None:
+        if self.stream is not None:
             self.stream.close()
+            self.stream = None # Completely dump the stream object reference
         self.is_playing = False
         self.current_frame = 0
         print("Playback Stopped.")
 
     def is_active(self) -> bool:
-        # Returns True if the track isn't finished yet
+        if self.data is None:
+            return False
         return self.current_frame < len(self.data)
 
 def main():
-    TRACK_PATH = "/home/promethei/Music/Milk & Kisses/01 - Violaine.mp3"
+    TRACK_PATH = "~/Music/Milk & Kisses/01 - Violaine.mp3"
     
     player = NativeAudioPlayer(TRACK_PATH)
+    
     if not player.load_file():
+        print("Initialization failed. Exiting.")
         return
 
     player.play()
