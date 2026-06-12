@@ -34,3 +34,23 @@ if __name__ == "__main__":
     
     if player.load_file():  
         player.play()
+        print("\n=======================================")                              
+        print("  Controls: [p] Pause  [r] Resume  [s] Stop")                            
+        print("=======================================")                                
+                                                                                
+        while player.is_active():                                                       
+            try:                                                                        
+                command = input("\nEnter control command: ").strip().lower()            
+                if command == 'p':                                                      
+                    player.pause()                                                      
+                elif command == 'r':                                                    
+                    player.resume()                                                     
+                elif command == 's':                                                    
+                    player.stop()                                                       
+                    break                                                               
+            except (KeyboardInterrupt, SystemExit):                                     
+                break                                                                   
+                                                                                
+        player.stop()                                                                   
+        print("Goodbye!")                                                               
+
